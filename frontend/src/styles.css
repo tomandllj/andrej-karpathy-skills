@@ -1,0 +1,68 @@
+* { box-sizing: border-box; }
+html, body, #app {
+  margin: 0;
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: #f5f7fa;
+  color: #303133;
+}
+a { color: #409eff; text-decoration: none; }
+
+.preview-body {
+  line-height: 1.7;
+  word-break: break-word;
+}
+.preview-body h1, .preview-body h2, .preview-body h3 {
+  margin-top: 1.2em;
+}
+.preview-body pre {
+  background: #f6f8fa;
+  padding: 12px;
+  border-radius: 6px;
+  overflow: auto;
+}
+.preview-body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.preview-body .mermaid {
+  text-align: center;
+  margin: 16px 0;
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  padding: 12px;
+}
+.anno-hl {
+  background: #fff3bf;
+  border-bottom: 2px solid #f5a623;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.anno-hl.flash {
+  animation: flashHL 1.2s ease;
+}
+@keyframes flashHL {
+  0%, 100% { background: #fff3bf; }
+  50% { background: #ffd666; box-shadow: 0 0 0 3px rgba(245,166,35,.35); }
+}
+.anno-bubble {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 2px;
+  padding: 0 4px;
+  font-size: 11px;
+  line-height: 1;
+  color: #fff;
+  background: #e6a23c;
+  border-radius: 9px;
+  vertical-align: super;
+  cursor: pointer;
+  user-select: none;
+}
+.comment-lost {
+  color: #e6a23c;
+  font-size: 12px;
+}
