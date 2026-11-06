@@ -1,31 +1,44 @@
 <template>
-  <el-dialog :model-value="modelValue" title="分享文档" width="520px" @close="$emit('update:modelValue', false)">
-    <el-form label-width="90px">
-      <el-form-item label="权限">
-        <el-select v-model="permission" style="width: 200px">
-          <el-option label="只读 read" value="read" />
-          <el-option label="仅评论 comment" value="comment" />
-          <el-option label="可编辑 edit" value="edit" />
-        </el-select>
-        <el-button type="primary" style="margin-left: 12px" :loading="loading" @click="create">
-          生成链接
-        </el-button>
-      </el-form-item>
-      <el-form-item v-if="lastUrl" label="链接">
-        <el-input :model-value="lastUrl" readonly>
-          <template #append>
-            <el-button @click="copy(lastUrl)">复制</el-button>
-          </template>
-        </el-input>
-      </el-form-item>
-    </el-form>
+  <el-dialog
+    :model-value="modelValue"
+    title="分享文档"
+    width="540px"
+    class="share-dialog"
+    @close="$emit('update:modelValue', false)"
+  >
+    <!-- <p class="hint">生成带权限的匿名链接，对方无需登录即可打开。</p> -->
 
-    <el-divider>已有分享</el-divider>
-    <el-table :data="shares" size="small" empty-text="暂无分享">
-      <el-table-column prop="permission" label="权限" width="100" />
+    <div class="create-row">
+      <div class="field">
+        <label>权限</label>
+        <el-select v-model="permission" style="width: 180px">
+          <el-option label="只读" value="read" />
+          <el-option label="仅评论" value="comment" />
+          <el-option label="可编辑" value="edit" />
+        </el-select>
+      </div>
+      <el-button type="primary" :loading="loading" @click="create">生成链接</el-button>
+    </div>
+
+    <div v-if="lastUrl" class="link-box">
+      <label>最新链接</label>
+      <el-input :model-value="lastUrl" readonly>
+        <template #append>
+          <el-button @click="copy(lastUrl)">复制</el-button>
+        </template>
+      </el-input>
+    </div>
+
+    <div class="section-label">已有分享</div>
+    <el-table :data="shares" size="small" empty-text="暂无分享" class="share-table">
+      <el-table-column prop="permission" label="权限" width="100">
+        <template #default="{ row }">
+          {{ { read: '只读', comment: '仅评论', edit: '可编辑' }[row.permission] || row.permission }}
+        </template>
+      </el-table-column>
       <el-table-column label="状态" width="90">
         <template #default="{ row }">
-          <el-tag :type="row.is_active ? 'success' : 'info'" size="small">
+          <el-tag :type="row.is_active ? 'success' : 'info'" size="small" effect="light" round>
             {{ row.is_active ? '有效' : '已关闭' }}
           </el-tag>
         </template>
@@ -35,7 +48,7 @@
           <el-button link type="primary" @click="copy(absUrl(row))">复制</el-button>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="160">
+      <el-table-column label="操作" width="120">
         <template #default="{ row }">
           <el-button
             v-if="row.is_active"
@@ -51,6 +64,7 @@
 </template>
 
 <script setup>
+/** 分享对话框：生成匿名链接并管理已有分享状态。 */
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { createShare, listShares, updateShare } from '@/api/doc'
@@ -113,3 +127,54 @@ watch(
   }
 )
 </script>
+
+<style scoped>
+/* 中文：分享对话框局部排版，色值跟全局 token */
+.hint {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.create-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+/* 中文：权限标签和下拉框同一行显示 */
+.field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.field label,
+.link-box label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.link-box {
+  margin-bottom: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--bg-page);
+  border: 1px solid var(--border-subtle);
+}
+.section-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.share-table {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+}
+</style>

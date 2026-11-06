@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>搬家到新端口</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; padding: 40px; line-height: 1.8; }
+  a { color: #2563eb; font-size: 16px; }
+  code { background: #f1f3f5; padding: 2px 6px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<h2>把旧端口浏览器数据搬到新端口</h2>
+<p id="tip">正在读取本机存储并跳转……</p>
+<a id="link" href="#">跳转没自动发生？点这里</a>
+<script>
+  // 中文：把 5273 旧端口存的所有本地数据打包装进 #import=，跳到 5373 新端口
+  ;(function () {
+    var target = 'http://127.0.0.1:5373/#import='
+    try {
+      var data = {}
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i)
+        var v = localStorage.getItem(k)
+        if (k && v) data[k] = v
+      }
+      var url = target + encodeURIComponent(JSON.stringify(data))
+      document.getElementById('link').href = url
+      location.replace(url)
+    } catch (e) {
+      document.getElementById('tip').textContent = '读取失败：' + e
+    }
+  })()
+</script>
+</body>
+</html>

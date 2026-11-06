@@ -1,0 +1,234 @@
+# Markdown 编辑器演示
+
+在左侧输入 **Markdown**，右侧实时预览。本文档展示常用语法效果。
+
+---
+
+## 标题
+
+# 一级标题 H1
+## 二级标题 H2
+### 三级标题 H3
+#### 四级标题 H4
+##### 五级标题 H5
+###### 六级标题 H6
+
+---
+
+## 文本样式
+
+普通段落文字。支持 **粗体**、*斜体*、***粗斜体***、~~删除线~~ 和 `行内代码`。
+
+换行可通过行末两个空格实现，  
+或空一行开始新段落。
+
+---
+
+## 链接与图片
+
+[Wails 官网](https://wails.io)
+
+![示例图片](https://picsum.photos/seed/mdeditor/400/120)
+
+---
+
+## 引用
+
+> 这是一段引用文字。
+>
+> 引用可以包含 **格式** 和多行内容。
+>
+> > 嵌套引用也支持。
+
+---
+
+## 列表
+
+### 无序列表
+
+- 第一项
+- 第二项
+  - 嵌套子项 A
+  - 嵌套子项 B
+- 第三项
+
+### 有序列表
+
+1. 安装 Go 1.20
+2. 安装 Wails CLI
+3. 运行 `wails dev`
+
+### 任务列表
+
+- [x] 左右分栏布局
+- [x] 实时预览
+- [ ] 导出 PDF
+- [ ] 主题切换
+
+---
+
+## 表格
+
+| 功能 | 支持 | 说明 |
+|------|:----:|------|
+| 标题 | ✅ | H1 ~ H6 |
+| 表格 | ✅ | GFM 表格 |
+| 代码高亮 | ✅ | highlight.js |
+| 流程图 | ✅ | Mermaid |
+| 数学公式 | ❌ | 未集成 |
+
+| 左对齐 | 居中 | 右对齐 |
+|:-------|:----:|-------:|
+| A | B | C |
+| 较长内容 | 中 | 123 |
+
+---
+
+## 代码块
+
+### Go
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Hello, Win7+")
+}
+```
+
+### JavaScript
+
+```javascript
+const greet = (name) => `Hello, ${name}!`
+console.log(greet("Markdown"))
+```
+
+### JSON
+
+```json
+{
+  "name": "mdeditor",
+  "stack": ["Wails", "Vue", "Go 1.20"]
+}
+```
+
+---
+
+## 流程图
+
+使用 `mermaid` 代码块，支持流程图、时序图、状态图等多种图表。
+
+### 自上而下（TD）
+
+```mermaid
+flowchart TD
+    A[开始] --> B{条件判断}
+    B -->|是| C[执行操作]
+    B -->|否| D[跳过]
+    C --> E[结束]
+    D --> E
+```
+
+### 自左向右（LR）
+
+编辑、预览、保存的横向工作流：
+
+```mermaid
+flowchart LR
+    A[输入 Markdown] --> B[实时预览]
+    B --> C{满意?}
+    C -->|是| D[保存历史]
+    C -->|否| A
+    D --> E[(BoltDB)]
+```
+
+### 子图与多分支
+
+应用启动与数据加载流程：
+
+```mermaid
+flowchart TD
+    Start([应用启动]) --> Init[初始化 Wails]
+    Init --> DB[打开 history.db]
+    DB --> Demo{演示数据存在?}
+    Demo -->|否| Seed[插入 demo.md]
+    Demo -->|是| UI[加载 UI 布局]
+    Seed --> UI
+    UI --> Ready[编辑器就绪]
+
+    subgraph frontend [前端]
+        UI --> Editor[编辑区]
+        UI --> Preview[预览区]
+    end
+
+    subgraph backend [后端 Go]
+        DB
+        Seed
+    end
+```
+
+### 时序图
+
+用户保存历史记录时的前后端交互：
+
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant V as Vue 前端
+    participant G as Go 后端
+    participant D as BoltDB
+
+    U->>V: 点击新建 (+)
+    V->>G: SaveHistory(content)
+    G->>G: extractTitle 提取标题
+    G->>D: 写入历史记录
+    D-->>G: 成功
+    G-->>V: 返回 HistoryItem
+    V->>G: ListHistory()
+    G-->>V: 更新侧边栏列表
+```
+
+### 状态图
+
+文档在编辑器中的状态流转：
+
+```mermaid
+stateDiagram-v2
+    [*] --> 空白
+    空白 --> 编辑中: 输入内容
+    编辑中 --> 编辑中: 继续编辑
+    编辑中 --> 已保存: 点击新建保存
+    已保存 --> 编辑中: 修改内容
+    编辑中 --> 历史浏览: 点击历史条目
+    历史浏览 --> 编辑中: 修改内容
+    历史浏览 --> 已保存: 再次保存
+```
+
+### 饼图
+
+功能模块占比示意：
+
+```mermaid
+pie title 编辑器功能构成
+    "Markdown 解析" : 35
+    "代码高亮" : 25
+    "历史记录" : 20
+    "Mermaid 图表" : 15
+    "窗口状态" : 5
+```
+
+---
+
+## 分隔线与行内元素
+
+段落上方的水平线：
+
+---
+
+行内组合：**粗体** 与 *斜体* 和 `code` 可混用；快捷键记忆：`Ctrl+S` 保存（示例）。
+
+---
+
+> 提示：修改左侧内容即可实时查看渲染效果。

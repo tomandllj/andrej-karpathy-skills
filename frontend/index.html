@@ -3,7 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MD批注协作平台</title>
+    <title>MD文档协助</title>
+    <script>
+      /* 中文：首屏前同步主题，避免闪白/闪黑 */
+      (function () {
+        try {
+          var t = localStorage.getItem('md_annotate_theme')
+          if (t !== 'light' && t !== 'dark') {
+            t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+          }
+          document.documentElement.setAttribute('data-theme', t)
+        } catch (e) {}
+      })()
+    </script>
   </head>
   <body>
     <div id="app"></div>

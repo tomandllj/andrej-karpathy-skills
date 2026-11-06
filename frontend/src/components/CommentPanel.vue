@@ -1,18 +1,43 @@
 <template>
-  <div class="panel-inner">
-    <div class="panel-title">批注列表</div>
-    <el-empty v-if="!comments.length" description="暂无批注，预览区选中文字可添加" :image-size="64" />
-    <div v-for="c in comments" :key="c.id" class="card" @click="$emit('focus', c.id)">
+  <div class="panel-inner" ref="panelRoot">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title">批注</div>
+        <div class="panel-sub">预览区选中文字后点「批注」</div>
+      </div>
+      <el-tag size="small" effect="plain" round>{{ comments.length }}</el-tag>
+    </div>
+
+    <el-empty
+      v-if="!sortedComments.length"
+      description="暂无批注"
+      :image-size="56"
+    />
+
+    <div
+      v-for="c in sortedComments"
+      :key="c.id"
+      class="card"
+      :class="{
+        active: Number(activeCommentId) === Number(c.id),
+        lost: isLost(c),
+      }"
+      :data-comment-id="c.id"
+      @click="$emit('focus', c.id)"
+    >
       <div class="meta">
-        <strong>{{ c.anon_name }}</strong>
-        <el-tag size="small" :type="c.status === 'resolved' ? 'success' : 'warning'">
+        <div class="who">
+          <span class="avatar">{{ (c.anon_name || '匿')[0] }}</span>
+          <strong>{{ c.anon_name }}</strong>
+        </div>
+        <el-tag size="small" effect="light" round :type="c.status === 'resolved' ? 'success' : 'warning'">
           {{ c.status === 'resolved' ? '已解决' : '待处理' }}
         </el-tag>
       </div>
       <div class="quote">「{{ c.selected_text }}」</div>
-      <div v-if="isLost(c)" class="comment-lost">原文位置已丢失，快照：{{ c.selected_text }}</div>
+      <div v-if="isLost(c)" class="comment-lost">原文已删除</div>
       <div class="body">{{ c.content }}</div>
-      <div class="time">{{ c.created_at }}</div>
+      <div class="time">{{ commentTimeLabel(c) }}</div>
       <div class="ops" @click.stop>
         <el-button link type="primary" size="small" @click="$emit('reply', c)">回复</el-button>
         <el-button
@@ -22,7 +47,7 @@
           @click="$emit('edit', c)"
         >编辑</el-button>
         <el-button
-          v-if="isOwner"
+          v-if="canResolve"
           link
           size="small"
           @click="$emit('resolve', c)"
@@ -36,10 +61,19 @@
         >删除</el-button>
       </div>
 
-      <div v-for="r in c.replies || []" :key="r.id" class="reply">
+      <div
+        v-for="r in c.replies || []"
+        :key="r.id"
+        class="reply"
+        :class="{ active: Number(activeCommentId) === Number(c.id) }"
+        @click.stop="$emit('focus', c.id)"
+      >
         <div class="meta">
-          <strong>{{ r.anon_name }}</strong>
-          <span class="time">{{ r.created_at }}</span>
+          <div class="who">
+            <span class="avatar sm">{{ (r.anon_name || '匿')[0] }}</span>
+            <strong>{{ r.anon_name }}</strong>
+          </div>
+          <span class="time">{{ commentTimeLabel(r) }}</span>
         </div>
         <div class="body">{{ r.content }}</div>
         <div class="ops" @click.stop>
@@ -52,18 +86,58 @@
 </template>
 
 <script setup>
+/** 批注侧栏：按正文位置从上到下展示根批注及其回复。 */
+import { computed, nextTick, ref, watch } from 'vue'
+import { resolveAnchor } from '@/utils/anchor'
+
 const props = defineProps({
   comments: { type: Array, default: () => [] },
   isOwner: Boolean,
+  /** 是否能标记/重开「已解决」：创建人或拿到 comment/edit 权限的协作者。 */
+  canResolve: Boolean,
   clientKey: String,
   markdown: { type: String, default: '' },
+  activeCommentId: { type: [Number, String], default: null },
 })
 
 defineEmits(['focus', 'reply', 'resolve', 'remove', 'edit'])
 
+const panelRoot = ref(null)
+
+/** 有效批注按位置升序，失锚沉底。 */
+const sortedComments = computed(() => {
+  return [...(props.comments || [])].sort((a, b) => {
+    const aLost = isLost(a)
+    const bLost = isLost(b)
+    if (aLost !== bLost) return aLost ? 1 : -1
+    const as = Number(a.offset_start) || 0
+    const bs = Number(b.offset_start) || 0
+    if (as !== bs) return as - bs
+    return (Number(a.id) || 0) - (Number(b.id) || 0)
+  })
+})
+
+/** 把时间写成 2026.11.06 10:52:00。 */
+function formatTime(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}.${pad(date.getMonth() + 1)}.${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
+/** 批注改过则显示修改时间，否则显示创建时间。 */
+function commentTimeLabel(row) {
+  const created = formatTime(row?.created_at)
+  if (row?.updated_at && row.updated_at !== row.created_at) return `修改 ${formatTime(row.updated_at)}`
+  return created
+}
+
+/** 判断批注是否已失锚。 */
 function isLost(c) {
-  const slice = (props.markdown || '').slice(c.offset_start, c.offset_end)
-  return slice !== c.selected_text
+  if (!c) return true
+  if (c._lost) return true
+  return resolveAnchor(props.markdown, c).lost
 }
 
 function canEdit(c) {
@@ -92,26 +166,151 @@ if (typeof window !== 'undefined') {
     localStorage.setItem(OWNED_KEY, JSON.stringify([...ownedIds]))
   })
 }
+
+function scrollToComment(id) {
+  if (!panelRoot.value || id == null) return false
+  const el = panelRoot.value.querySelector(`.card[data-comment-id="${id}"]`)
+  if (!el) return false
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  return true
+}
+
+watch(
+  () => props.activeCommentId,
+  async (id) => {
+    if (id == null) return
+    await nextTick()
+    scrollToComment(id)
+  }
+)
+
+defineExpose({ scrollToComment })
 </script>
 
 <style scoped>
-.panel-inner { padding: 12px; }
-.panel-title { font-weight: 600; margin-bottom: 10px; }
+/* 中文：批注侧栏卡片与头像的 Teal Flat 样式 */
+.panel-inner {
+  padding: 16px 14px 24px;
+}
+.panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 0 2px;
+}
+.panel-title {
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+.panel-sub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
 .card {
-  border: 1px solid #ebeef5; border-radius: 8px; padding: 10px;
-  margin-bottom: 10px; background: #fff; cursor: pointer;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: var(--bg-elevated);
+  cursor: pointer;
+  transition: border-color var(--motion-fast), background var(--motion-fast),
+    box-shadow var(--motion-fast);
 }
-.card:hover { border-color: #f5a623; }
-.meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.card:hover {
+  border-color: var(--accent);
+}
+.card.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-ring);
+  background: var(--accent-soft);
+}
+.card.lost {
+  opacity: 0.72;
+  background: var(--bg-muted);
+}
+.meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.who strong {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+.avatar.sm {
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+}
 .quote {
-  margin: 6px 0; padding: 6px 8px; background: #fafafa; color: #606266;
-  font-size: 12px; border-left: 3px solid #f5a623; border-radius: 4px;
+  margin: 8px 0;
+  padding: 8px 10px;
+  background: var(--warning-soft);
+  color: var(--text-secondary);
+  font-size: 12px;
+  border-left: 3px solid var(--warning);
+  border-radius: 0 8px 8px 0;
+  line-height: 1.45;
 }
-.body { white-space: pre-wrap; font-size: 14px; }
-.time { color: #909399; font-size: 12px; margin-top: 4px; }
-.ops { margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap; }
+.body {
+  white-space: pre-wrap;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-primary);
+}
+.time {
+  color: var(--text-muted);
+  font-size: 11.5px;
+  margin-top: 6px;
+}
+.ops {
+  margin-top: 8px;
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+}
 .reply {
-  margin-top: 8px; margin-left: 10px; padding: 8px;
-  background: #f8fafc; border-radius: 6px; border: 1px dashed #e4e7ed;
+  margin-top: 10px;
+  margin-left: 4px;
+  padding: 10px;
+  background: var(--bg-muted);
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
+}
+.reply:hover {
+  border-color: var(--accent);
+}
+.reply.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-ring);
 }
 </style>

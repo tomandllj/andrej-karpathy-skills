@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import get_active_share, get_doc_or_404, require_owner
-from app.models import DocumentShare
+from app.models import DocumentShare, UserDoc
+from app.routers.admin_auth import current_user_id, require_user_id
 from app.schemas import DocOut, ShareCreate, ShareOut, ShareUpdate
 from app.utils import gen_share_token, now_iso
 
@@ -29,10 +30,11 @@ def create_share(
     doc_id: int,
     body: ShareCreate,
     db: Session = Depends(get_db),
+    authorization: str | None = Header(default=None),
     x_owner_secret: str | None = Header(default=None, alias="X-Owner-Secret"),
 ):
     doc = get_doc_or_404(db, doc_id)
-    require_owner(doc, x_owner_secret)
+    require_owner(doc, x_owner_secret, current_user_id(authorization))
     share = DocumentShare(
         doc_id=doc.id,
         share_token=gen_share_token(),
@@ -50,10 +52,11 @@ def create_share(
 def list_shares(
     doc_id: int,
     db: Session = Depends(get_db),
+    authorization: str | None = Header(default=None),
     x_owner_secret: str | None = Header(default=None, alias="X-Owner-Secret"),
 ):
     doc = get_doc_or_404(db, doc_id)
-    require_owner(doc, x_owner_secret)
+    require_owner(doc, x_owner_secret, current_user_id(authorization))
     rows = (
         db.query(DocumentShare)
         .filter(DocumentShare.doc_id == doc_id)
@@ -85,13 +88,14 @@ def update_share(
     share_id: int,
     body: ShareUpdate,
     db: Session = Depends(get_db),
+    authorization: str | None = Header(default=None),
     x_owner_secret: str | None = Header(default=None, alias="X-Owner-Secret"),
 ):
     share = db.query(DocumentShare).filter(DocumentShare.id == share_id).first()
     if not share:
         raise HTTPException(status_code=404, detail="分享记录不存在")
     doc = get_doc_or_404(db, share.doc_id, include_deleted=True)
-    require_owner(doc, x_owner_secret)
+    require_owner(doc, x_owner_secret, current_user_id(authorization))
     if body.permission is not None:
         share.permission = body.permission
     if body.is_active is not None:
@@ -105,13 +109,50 @@ def update_share(
 def delete_share(
     share_id: int,
     db: Session = Depends(get_db),
+    authorization: str | None = Header(default=None),
     x_owner_secret: str | None = Header(default=None, alias="X-Owner-Secret"),
 ):
     share = db.query(DocumentShare).filter(DocumentShare.id == share_id).first()
     if not share:
         raise HTTPException(status_code=404, detail="分享记录不存在")
     doc = get_doc_or_404(db, share.doc_id, include_deleted=True)
-    require_owner(doc, x_owner_secret)
+    require_owner(doc, x_owner_secret, current_user_id(authorization))
     share.is_active = 0
     db.commit()
     return {"ok": True}
+
+
+@router.post("/api/share/{token}/save")
+def save_shared_doc(
+    token: str,
+    db: Session = Depends(get_db),
+    authorization: str | None = Header(default=None),
+):
+    """已登录的人打开分享链接后，把这篇记进他的「收到的」；已有归类不动，只更新权限。"""
+    user_id = require_user_id(authorization)
+    share = get_active_share(db, token)  # 分享已关闭则 404
+    doc = get_doc_or_404(db, share.doc_id)
+    if doc.user_id == user_id:
+        # 分回给创建人自己：文档本来就在他的列表里
+        return {"ok": True, "owned": True}
+    row = (
+        db.query(UserDoc)
+        .filter(UserDoc.user_id == user_id, UserDoc.doc_id == doc.id)
+        .first()
+    )
+    ts = now_iso()
+    if row is None:
+        row = UserDoc(
+            user_id=user_id,
+            doc_id=doc.id,
+            folder_id=None,
+            permission=share.permission,
+            created_at=ts,
+            updated_at=ts,
+        )
+        db.add(row)
+    else:
+        row.permission = share.permission
+        row.updated_at = ts
+    db.commit()
+    return {"ok": True, "owned": False}

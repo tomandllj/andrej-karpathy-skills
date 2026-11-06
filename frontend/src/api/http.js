@@ -17,6 +17,10 @@ http.interceptors.request.use((config) => {
   if (!config.headers['X-Client-Key']) {
     config.headers['X-Client-Key'] = getClientKey()
   }
+  const adminToken = localStorage.getItem('admin_token')
+  if (adminToken && !config.headers.Authorization) {
+    config.headers.Authorization = `Bearer ${adminToken}`
+  }
   if (config.params?._docId) {
     const { _docId, ...rest } = config.params
     config.params = rest

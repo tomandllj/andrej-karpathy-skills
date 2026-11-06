@@ -1,5 +1,5 @@
 <template>
-  <el-dialog :model-value="modelValue" title="版本历史" width="720px" @close="$emit('update:modelValue', false)">
+  <el-dialog :model-value="modelValue" title="版本历史" width="720px" class="version-dialog" @close="$emit('update:modelValue', false)">
     <el-table :data="versions" size="small" v-loading="loading" max-height="360">
       <el-table-column prop="version_no" label="版本" width="80" />
       <el-table-column prop="created_at" label="时间" width="200" />
@@ -23,6 +23,7 @@
 </template>
 
 <script setup>
+/** 版本历史对话框：查看快照、Diff 与回滚。 */
 import { ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as Diff from 'diff'
@@ -96,16 +97,20 @@ watch(
 </script>
 
 <style scoped>
+/* 中文：版本快照与 Diff 高亮色 */
 .snap {
   white-space: pre-wrap;
-  font-family: ui-monospace, Menlo, Consolas, monospace;
-  font-size: 12px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.55;
   max-height: 480px;
   overflow: auto;
-  background: #fafafa;
-  padding: 12px;
-  border-radius: 6px;
+  background: var(--bg-muted);
+  border: 1px solid var(--border-subtle);
+  padding: 14px 16px;
+  border-radius: 10px;
+  color: var(--text-primary);
 }
-:deep(.add) { background: #e1f3d8; }
-:deep(.del) { background: #fde2e2; }
+:deep(.add) { background: var(--success-soft); }
+:deep(.del) { background: var(--danger-soft); text-decoration: line-through; }
 </style>
