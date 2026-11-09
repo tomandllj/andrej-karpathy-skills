@@ -27,6 +27,8 @@ class UserDoc(Base):
     folder_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # 最近一次打开分享链接时的权限，作为收件人之后的默认权限
     permission: Mapped[str] = mapped_column(String(16), nullable=False, default="read")
+    # 站内投递的新分享标记为 1；接收人打开文档后清 0，首页据此显示「新」
+    is_new: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[str] = mapped_column(Text, nullable=False)
     updated_at: Mapped[str] = mapped_column(Text, nullable=False)
 
@@ -69,6 +71,18 @@ class DocumentShare(Base):
     share_token: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     permission: Mapped[str] = mapped_column(String(16), nullable=False)
     is_active: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class ShareRecipient(Base):
+    """一条分享指定的接收人；没有记录表示不限定，谁拿到链接都行。"""
+
+    __tablename__ = "share_recipient"
+    __table_args__ = (UniqueConstraint("share_id", "user_id", name="uq_share_recipient"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    share_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     created_at: Mapped[str] = mapped_column(Text, nullable=False)
 
 

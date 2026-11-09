@@ -45,6 +45,8 @@ class MineDocItem(DocListItem):
     origin: str = "owned"
     # 收到时，创建者的用户名
     from_name: Optional[str] = None
+    # 站内投递后尚未打开过：首页显示「新」标签；打开文档后清掉
+    is_new: bool = False
 
 
 class DocOut(BaseModel):
@@ -86,6 +88,8 @@ class DocSearchRequest(BaseModel):
 
 class ShareCreate(BaseModel):
     permission: Permission = "comment"
+    # 接收人账号编号；空列表表示不限定，链接谁都能开
+    recipient_ids: list[int] = Field(default_factory=list)
 
 
 class ShareUpdate(BaseModel):
@@ -101,6 +105,15 @@ class ShareOut(BaseModel):
     is_active: int
     created_at: str
     share_url_path: str
+    # 接收人用户名；空列表表示不限
+    recipients: list[str] = Field(default_factory=list)
+
+
+class UserBrief(BaseModel):
+    """账号的编号和用户名，给分享对话框的接收人下拉用。"""
+
+    id: int
+    username: str
 
 
 class VersionOut(BaseModel):

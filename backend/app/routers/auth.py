@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.database import ADMIN_DB_USERNAME, get_db
@@ -20,8 +20,9 @@ from app.routers.admin_auth import (
     _locked_response,
     _normalize_path,
     _record_failure,
+    require_user_id,
 )
-from app.schemas import AuthLoginIn, AuthRegisterIn, AuthTokenOut
+from app.schemas import AuthLoginIn, AuthRegisterIn, AuthTokenOut, UserBrief
 from app.settings import get_settings
 from app.utils import hash_password, verify_password
 
@@ -101,3 +102,19 @@ def login(body: AuthLoginIn, request: Request, db: Session = Depends(get_db)):
 def entry():
     """公开登录入口路径：唯一登录/注册页在 ini 的 login_path，未登录跳转和退出回跳都用它。"""
     return {"login_path": _normalize_path(get_settings().login_path)}
+
+
+@router.get("/user/list", response_model=list[UserBrief])
+def list_users(
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    """登录后可用的账号名单（排除管理员和自己），给分享对话框选接收人用。"""
+    user_id = require_user_id(authorization)
+    rows = (
+        db.query(AppUser)
+        .filter(AppUser.username != ADMIN_DB_USERNAME, AppUser.id != user_id)
+        .order_by(AppUser.username.asc())
+        .all()
+    )
+    return [UserBrief(id=r.id, username=r.username) for r in rows]

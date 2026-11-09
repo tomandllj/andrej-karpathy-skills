@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.deps import get_doc_or_404, get_user_doc, is_doc_owner
+from app.deps import get_doc_or_404, get_user_doc, is_doc_owner, require_share_access
 from app.models import Comment, Document, DocumentShare
 from app.routers.admin_auth import current_user_id
 from app.settings import get_settings
@@ -106,6 +106,8 @@ def _resolve_permission(
             .first()
         )
         if share:
+            # 限接收人的分享：非接收人拿不到任何批注权限
+            require_share_access(db, share, user_id)
             return share.permission
     if user_id is not None:
         link = get_user_doc(db, user_id, doc.id)

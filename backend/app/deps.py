@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import Header, HTTPException
 from sqlalchemy.orm import Session
 
-from app.models import Document, DocumentShare, UserDoc
+from app.models import Document, DocumentShare, ShareRecipient, UserDoc
 
 
 def is_doc_owner(doc: Document, owner_secret: str | None, user_id: int | None = None) -> bool:
@@ -41,6 +41,26 @@ def get_active_share(db: Session, token: str) -> DocumentShare:
     if not share:
         raise HTTPException(status_code=404, detail="分享链接无效或已关闭")
     return share
+
+
+def share_recipient_ids(db: Session, share_id: int) -> set[int]:
+    """取一条分享指定的全部接收人编号；空集合表示不限定。"""
+    rows = db.query(ShareRecipient).filter(ShareRecipient.share_id == share_id).all()
+    return {row.user_id for row in rows}
+
+
+def require_share_access(db: Session, share: DocumentShare, user_id: int | None) -> None:
+    """分享指定了接收人且权限非只读时，要求登录者是接收人之一，否则 403。
+
+    只读分享豁免：匿名也能看（规则：所有只读链接免登录可查看）。
+    """
+    if share.permission == "read":
+        return
+    ids = share_recipient_ids(db, share.id)
+    if not ids:
+        return
+    if user_id is None or user_id not in ids:
+        raise HTTPException(status_code=403, detail="该分享仅限指定接收人，请登录后查看")
 
 
 def get_doc_or_404(db: Session, doc_id: int, include_deleted: bool = False) -> Document:

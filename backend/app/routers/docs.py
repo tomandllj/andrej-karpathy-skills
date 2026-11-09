@@ -5,8 +5,8 @@ from fastapi.responses import PlainTextResponse
 from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session
 
-from app.database import get_db
-from app.deps import get_doc_or_404, get_user_doc, is_doc_owner, require_owner
+from app.database import ADMIN_DB_USERNAME, get_db
+from app.deps import get_doc_or_404, get_user_doc, is_doc_owner, require_owner, require_share_access
 from app.models import AppUser, Comment, Document, DocumentShare, DocumentVersion, Folder, UserDoc
 from app.routers.admin_auth import current_user_id, require_user_id
 from app.schemas import (
@@ -35,11 +35,15 @@ def _is_owner(doc: Document, secret: str | None, user_id: int | None = None) -> 
 
 
 def _owner_name(db: Session, doc: Document) -> str | None:
-    """取文档创建者的用户名；匿名时期的旧文档返回 None。"""
+    """取文档创建者的用户名；匿名时期的旧文档返回 None；管理员显示为「管理员」。"""
     if doc.user_id is None:
         return None
     row = db.get(AppUser, doc.user_id)
-    return row.username if row else None
+    if not row:
+        return None
+    if row.username == ADMIN_DB_USERNAME:
+        return "管理员"
+    return row.username
 
 
 def _resolve_edit_permission(
@@ -63,6 +67,8 @@ def _resolve_edit_permission(
             .first()
         )
         if share:
+            # 限接收人的分享：非接收人拿不到编辑权限
+            require_share_access(db, share, user_id)
             return share.permission == "edit", share.permission
     if user_id is not None:
         link = get_user_doc(db, user_id, doc.id)
@@ -306,6 +312,7 @@ def _doc_list_item(
     origin: str = "owned",
     from_name: str | None = None,
     folder_id: int | None = None,
+    is_new: bool = False,
 ) -> MineDocItem:
     """把文档行转成首页「我的文档」条目，附带批注统计与归属信息。"""
     return MineDocItem(
@@ -325,6 +332,7 @@ def _doc_list_item(
         latest_comment_at=latest.get(doc.id, (None, None))[1],
         origin=origin,
         from_name=from_name,
+        is_new=is_new,
     )
 
 
@@ -353,11 +361,13 @@ def my_docs(
     )
 
     # 逐条记下归属和各自行内的文件夹，再统一算批注统计
-    entries: list[tuple[Document, str, str | None, int | None]] = [
-        (doc, "owned", None, doc.folder_id) for doc in owned_rows
+    entries: list[tuple[Document, str, str | None, int | None, bool]] = [
+        (doc, "owned", None, doc.folder_id, False) for doc in owned_rows
     ]
     for link, doc, owner_name in received_rows:
-        entries.append((doc, "received", owner_name or "未知", link.folder_id))
+        entries.append(
+            (doc, "received", owner_name or "未知", link.folder_id, bool(link.is_new))
+        )
 
     entries.sort(key=lambda e: e[0].updated_at, reverse=True)
     doc_ids = [doc.id for doc, *_ in entries]
@@ -375,8 +385,9 @@ def my_docs(
             origin=origin,
             from_name=from_name,
             folder_id=folder_id,
+            is_new=is_new,
         )
-        for doc, origin, from_name, folder_id in entries
+        for doc, origin, from_name, folder_id, is_new in entries
     ]
 
 
@@ -431,6 +442,8 @@ def get_doc(
         )
         if not share:
             raise HTTPException(status_code=403, detail="无权访问该文档")
+        # 限接收人的非只读分享：非接收人打不开
+        require_share_access(db, share, user_id)
         permission = share.permission
         share_id = share.id
         token_out = share.share_token
@@ -442,6 +455,13 @@ def get_doc(
             origin = "received"
             from_name = _owner_name(db, doc)
             folder_out = link.folder_id
+
+    # 收件人打开文档即视为已读（无论从首页还是分享链接进来），清掉「新」标记
+    if not owner and user_id is not None:
+        link = get_user_doc(db, user_id, doc.id)
+        if link is not None and link.is_new:
+            link.is_new = 0
+            db.commit()
 
     return DocOut(
         id=doc.id,

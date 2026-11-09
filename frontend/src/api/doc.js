@@ -72,11 +72,13 @@ export function exportUrl(docId) {
   return `/api/doc/${docId}/export`
 }
 
-export function createShare(docId, permission) {
+export function createShare(docId, permission, recipientIds = []) {
   const headers = {}
   const secret = getOwnerSecret(docId)
   if (secret) headers['X-Owner-Secret'] = secret
-  return http.post(`/api/doc/${docId}/share`, { permission }, { headers }).then((r) => r.data)
+  return http
+    .post(`/api/doc/${docId}/share`, { permission, recipient_ids: recipientIds }, { headers })
+    .then((r) => r.data)
 }
 
 export function listShares(docId) {
@@ -100,6 +102,11 @@ export function getByShareToken(token) {
 /** 登录后打开分享链接，把这篇记进「收到的」。 */
 export function claimShare(token) {
   return http.post(`/api/share/${token}/save`).then((r) => r.data)
+}
+
+/** 登录后可用的账号名单（排除管理员和自己），给分享对话框选接收人用。 */
+export function listUsers() {
+  return http.get('/api/auth/user/list').then((r) => r.data)
 }
 
 /** 当前账号的文档：自己创建的 + 收到的分享。 */

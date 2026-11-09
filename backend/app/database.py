@@ -90,6 +90,17 @@ def _migrate_app_user_password_column() -> None:
             conn.exec_driver_sql("ALTER TABLE app_user ADD COLUMN password_hash TEXT")
 
 
+def _migrate_user_doc_new_column() -> None:
+    """给旧库的 user_doc 表补「新」标记列（已存在则跳过）。"""
+    with engine.begin() as conn:
+        rows = conn.exec_driver_sql("PRAGMA table_info(user_doc)").fetchall()
+        if not rows:
+            return
+        cols = {r[1] for r in rows}
+        if "is_new" not in cols:
+            conn.exec_driver_sql("ALTER TABLE user_doc ADD COLUMN is_new INTEGER DEFAULT 0")
+
+
 def _migrate_admin_identity() -> None:
     """把历史管理员行并入固定身份 __admin__，文件夹、文档、收件记录跟着转移。
 
@@ -182,5 +193,6 @@ def init_db():
     _migrate_document_owner_columns()
     _migrate_folder_pin_column()
     _migrate_app_user_password_column()
+    _migrate_user_doc_new_column()
     _migrate_admin_identity()
     _repair_doc_updated_at_touched_by_comments()

@@ -86,9 +86,19 @@
           class="nav-item"
           :class="{ 'is-active': selectedFolderId === null }"
           @click="selectFolder(null)"
-        >
-          <span>未分类</span>
-          <span class="count-wrap">
+          >
+            <span>未分类</span>
+            <el-tag
+              v-if="folderHasNew(null)"
+              size="small"
+              effect="light"
+              round
+              type="danger"
+              title="有新收到的文档"
+            >
+              新
+            </el-tag>
+            <span class="count-wrap">
             <el-tag
               v-if="folderPendingCount(null)"
               size="small"
@@ -116,6 +126,16 @@
             @click="selectFolder(folder.id)"
           >
             <span class="folder-name">{{ folder.name }}</span>
+            <el-tag
+              v-if="folderHasNew(folder.id)"
+              size="small"
+              effect="light"
+              round
+              type="danger"
+              title="有新收到的文档"
+            >
+              新
+            </el-tag>
             <span class="count-wrap">
               <el-tag
                 v-if="folderPendingCount(folder.id)"
@@ -163,8 +183,18 @@
               :class="{ 'is-active': selectedInbox === 'all' }"
               @click="selectInbox('all')"
             >
-              <span>全部</span>
-              <span class="count">{{ inboxCount(null) }}</span>
+            <span>全部</span>
+            <el-tag
+              v-if="inboxHasNew()"
+              size="small"
+              effect="light"
+              round
+              type="danger"
+              title="有新收到的文档"
+            >
+              新
+            </el-tag>
+            <span class="count">{{ inboxCount(null) }}</span>
             </button>
             <button
               v-for="person in inboxPeople"
@@ -174,8 +204,18 @@
               :class="{ 'is-active': selectedInbox === person.name }"
               @click="selectInbox(person.name)"
             >
-              <span class="folder-name">{{ person.name }}</span>
-              <span class="count">{{ inboxCount(person.name) }}</span>
+            <span class="folder-name">{{ person.name }}</span>
+            <el-tag
+              v-if="inboxHasNew(person.name)"
+              size="small"
+              effect="light"
+              round
+              type="danger"
+              title="有新收到的文档"
+            >
+              新
+            </el-tag>
+            <span class="count">{{ inboxCount(person.name) }}</span>
             </button>
           </template>
         </div>
@@ -264,6 +304,17 @@
               <button type="button" class="title-link" @click.stop="openDoc(row)">
                 {{ row.title || '无标题文档' }}
               </button>
+              <!-- 中文：站内投递后尚未打开过的文档，标题旁标「新」 -->
+              <el-tag
+                v-if="row.is_new"
+                class="new-tag"
+                size="small"
+                effect="light"
+                round
+                type="danger"
+              >
+                新
+              </el-tag>
               <!-- 中文：收到别人分享的文档，标题旁标出是谁发来的 -->
               <span v-if="row.origin === 'received'" class="from-tag">
                 来自 {{ row.from_name || '未知' }}
@@ -855,6 +906,27 @@ function inboxCount(person) {
   }).length
 }
 
+/** 「收到的」里是否还有没打开过的新文档；person 为空看全部，用于侧栏「新」标签。 */
+function inboxHasNew(person) {
+  return docs.value.some(
+    (d) =>
+      d.origin === 'received' &&
+      (d.folder_id ?? null) === null &&
+      d.is_new &&
+      (person == null || (d.from_name || '未知') === person)
+  )
+}
+
+/** 文件夹里是否还有没打开过的新文档；null 表示未分类（只算自己创建的），用于侧栏「新」标签。 */
+function folderHasNew(folderId) {
+  return docs.value.some(
+    (d) =>
+      (d.folder_id ?? null) === folderId &&
+      d.is_new &&
+      !(folderId === null && d.origin === 'received')
+  )
+}
+
 /** 新建文档时带上当前文件夹；未分类则不传。 */
 function folderPayload() {
   if (selectedFolderId.value == null) return {}
@@ -1358,6 +1430,10 @@ onActivated(onHomeActivated)
 .inbox-block.is-collapsed + .recent-block {
   margin-top: 0;
   padding-top: 0;
+}
+/* 中文：站内投递后尚未打开过，列表标题旁的小「新」标 */
+.new-tag {
+  margin-left: 6px;
 }
 .from-tag {
   display: inline-block;
